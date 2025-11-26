@@ -1,0 +1,62 @@
+{
+  "settings": {
+    "index": {
+      "number_of_shards": 3,
+      "number_of_replicas": 1,
+      "refresh_interval": "1s",
+      "analysis": {
+        "analyzer": {
+          "russian_morphology": {
+            "type": "custom",
+            "tokenizer": "standard",
+            "filter": [
+              "lowercase",
+              "russian_stop",
+              "russian_keywords",
+              "russian_stemmer"
+            ]
+          }
+        },
+        "filter": {
+          "russian_stop": {
+            "type": "stop",
+            "stopwords": "_russian_"
+          },
+          "russian_keywords": {
+            "type": "keyword_marker",
+            "keywords": []
+          },
+          "russian_stemmer": {
+            "type": "stemmer",
+            "language": "russian"
+          }
+        }
+      }
+    }
+  },
+  "mappings": {
+    "properties": {
+      "messageId": {
+        "type": "keyword"
+      },
+      "chatId": {
+        "type": "keyword"
+      },
+      "senderId": {
+        "type": "keyword"
+      },
+      "content": {
+        "type": "text",
+        "analyzer": "russian_morphology",
+        "fields": {
+          "keyword": {
+            "type": "keyword"
+          }
+        }
+      },
+      "createdAt": {
+        "type": "date"
+      }
+    }
+  }
+}

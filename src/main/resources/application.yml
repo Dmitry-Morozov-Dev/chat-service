@@ -1,0 +1,156 @@
+server:
+  port: 8082
+  compression:
+    enabled: true
+    mime-types:
+      - application/json
+      - text/plain
+
+spring:
+  application:
+    name: chat-service
+
+  webflux:
+    websocket:
+      extensions: deflate-frame
+  main:
+    allow-bean-definition-overriding: true
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:kafka:29092}
+    topic:
+      message.in: ${KAFKA_TOPIC_MESSAGES_IN:messages-in}
+      dlq: ${KAFKA_TOPIC_DLQ:chat.dlq}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      compression-type: snappy
+      acks: all
+      retries: 3
+      linger-ms: 1
+      batch-size: 16384
+    consumer:
+      group-id: ${KAFKA_CONSUMER_GROUP:chat-group}
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      fetch-max-bytes: 52428800
+      max-poll-records: 500
+      isolation-level: read_committed
+
+  data:
+    cassandra:
+      keyspace-name: ${CASSANDRA_KEYSPACE:chat_keyspace}
+      contact-points: ${CASSANDRA_CONTACT_POINTS:localhost:9042}
+      local-datacenter: ${CASSANDRA_DC:datacenter1}
+      schema-action: create_if_not_exists
+      cluster-name: messenger-local
+      request:
+        timeout: 2000ms
+      connection:
+        connect-timeout: 30000ms
+        init-query-timeout: 30000ms
+    elasticsearch:
+      uris: ${ELASTICSEARCH_URIS:http://localhost:9200}
+      username: ${ELASTICSEARCH_USERNAME:}
+      password: ${ELASTICSEARCH_PASSWORD:}
+      connection-timeout: 5000ms
+      socket-timeout: 30000ms
+      index-prefix: ${ELASTICSEARCH_INDEX_PREFIX:chat_}
+      auto-configuration:
+        create-index-on-startup: false
+
+redis:
+  cache:
+    cluster:
+      nodes: ${REDIS_CACHE_NODES:localhost:6391,localhost:6392,localhost:6393}
+    config:
+      connect-timeout-ms: 500
+      command-timeout-ms: 1000
+      shutdown-timeout-ms: 100
+      max-redirects: 5
+      topology-refresh-periodic-sec: 10
+      validate-cluster-node-membership: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus,loggers
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    root: INFO
+    org:
+      springframework: INFO
+      springframework.web: INFO
+      reactor.netty: INFO
+    com:
+      messenger:
+        chat_service_new: DEBUG
+
+network:
+  timeouts:
+    redis:
+      pubsub-command-timeout-ms: 1000
+      cache-command-timeout-ms: 3000
+    kafka:
+      request-timeout-ms: 30000
+
+# change in prod
+security:
+  kafka:
+    ssl:
+      enabled: ${KAFKA_SSL_ENABLED:false}
+      truststore-location: ${KAFKA_SSL_TRUSTSTORE_LOCATION:}
+      truststore-password: ${KAFKA_SSL_TRUSTSTORE_PASSWORD:}
+  grpc:
+    tls-enabled: false
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      redisOps:
+        registerHealthIndicator: true
+        slidingWindowSize: 50
+        failureRateThreshold: 30
+        waitDurationInOpenState: 10s
+        ignoreExceptions:
+          - com.messenger.chat_service_new.error.ServiceDegradedException
+        recordExceptions:
+          - org.springframework.data.redis.RedisConnectionFailureException
+
+chat:
+  id: ${CHAT_ID:chat-${random.uuid}}    # change in prod
+  unread-limit: 50
+  max-limit: 100
+  default-notifications: default
+  message:
+    max-limit: 100
+
+app:
+  pagination:
+    default-limit: 20
+    default-offset: 0
+    max-limit: 100
+  chat_participant_buckets_amount: 1
+
+grpc:
+  server:
+    port: ${GRPC_SERVER_PORT:9090}
+    keep-alive-time: 60s
+    keep-alive-timeout: 20s
+    max-inbound-message-size: 4194304  # 4MB
+
+kafka:
+  consumer:
+    threads: 4
+  topics:
+    message.in: messages-in
