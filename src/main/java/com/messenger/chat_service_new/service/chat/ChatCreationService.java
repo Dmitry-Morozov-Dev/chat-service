@@ -68,14 +68,14 @@ public class ChatCreationService {
 
                     Mono<Void> creatorUserChat = Mono.when(
                             participantService.saveUserChat(creatorId, savedChat.getChatId(), savedChat.getChatType().name(), otherUser.getName(), otherUser.getAvatar()),
-                            participantService.saveUserChatsList(creatorId, savedChat.getChatId())
+                            participantService.saveUserChatsList(creatorId, savedChat)
                     ).then();
 
                     Mono<Void> otherUserChat = userRepository.findByUserId(creatorId)
                             .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Creator user not found")))
                             .flatMap(creatorUser -> Mono.when(
                                     participantService.saveUserChat(otherUserId, savedChat.getChatId(), savedChat.getChatType().name(), creatorUser.getName(), creatorUser.getAvatar()),
-                                    participantService.saveUserChatsList(otherUserId, savedChat.getChatId())
+                                    participantService.saveUserChatsList(otherUserId, savedChat)
                             )).then();
 
                     return Mono.when(creatorParticipant, otherParticipant, creatorUserChat, otherUserChat)
@@ -88,13 +88,13 @@ public class ChatCreationService {
                 .flatMap(userId -> Mono.when(
                         participantService.saveParticipant(savedChat.getChatId(), userId, Role.MEMBER, now),
                         participantService.saveUserChat(userId, savedChat.getChatId(), savedChat.getChatType().name(), savedChat.getName(), savedChat.getAvatar()),
-                        participantService.saveUserChatsList(userId, savedChat.getChatId())
+                        participantService.saveUserChatsList(userId, savedChat)
                 ))
                 .then();
 
         Mono<Void> creatorUserChat = Mono.when(
                 participantService.saveUserChat(creatorId, savedChat.getChatId(), savedChat.getChatType().name(), savedChat.getName(), savedChat.getAvatar()),
-                participantService.saveUserChatsList(creatorId, savedChat.getChatId())
+                participantService.saveUserChatsList(creatorId, savedChat)
         ).then();
 
         return Mono.when(creatorParticipant, members, creatorUserChat)

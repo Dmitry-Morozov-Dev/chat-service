@@ -7,8 +7,10 @@ import com.messenger.chat_service_new.modelHelper.utils.ChatWithTime;
 import com.messenger.chat_service_new.repository.MessageRepository;
 import com.messenger.chat_service_new.repository.UserChatsInfoRepository;
 import com.messenger.chat_service_new.repository.UserChatsListRepository;
+import com.messenger.chat_service_new.service.message.MessageFetcher;
 import com.messenger.chat_service_new.utils.BucketPartitionCalculator;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -20,11 +22,13 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserChatsBuilder {
 
     private final MessageRepository messageRepository;
+    private final MessageFetcher messageFetcher;
     private final UserChatsInfoRepository userChatsInfoRepository;
     private final UserChatsListRepository userChatsListRepository;
 
@@ -37,11 +41,17 @@ public class UserChatsBuilder {
                     }
 
                     return Flux.fromIterable(chatIdsList)
-                            .flatMap(chatList -> messageRepository.findLastMessageTime(chatList.getChatId())
-                                    .map(time -> ChatWithTime.builder()
-                                            .chatId(chatList.getChatId())
-                                            .lastMessageTime(time)
-                                            .build()), 10)
+                            .flatMap(chatList -> {
+                                log.error("1");
+                                return messageFetcher.findLastMessageTimeInChat(chatList)
+                                        .map(time -> {
+                                            log.error("2");
+                                            return ChatWithTime.builder()
+                                                    .chatId(chatList.getChatId())
+                                                    .lastMessageTime(time)
+                                                    .build();
+                                        });
+                            }, 10)
                             .collectSortedList(Comparator.comparing(ChatWithTime::getLastMessageTime).reversed())
                             .map(sorted -> {
                                 int start = (int) Math.min(offset, sorted.size());
@@ -68,20 +78,25 @@ public class UserChatsBuilder {
 
             return messageRepository.findMessagesIdsAfterWithLimit(chatWithTime.getChatId(), bucketMonth, lastRead, unreadLimit)
                     .collectList()
-                    .map(messages -> {
+                    .flatMap(messages -> {
                         String unread = messages.size() >= unreadLimit ? unreadLimit + "+" : String.valueOf(messages.size());
-                        return UserChatDTO.builder()
-                                .chatId(chatInfo.getChatId())
-                                .chatType(chatInfo.getChatType())
-                                .name(chatInfo.getName())
-                                .avatar(chatInfo.getAvatar())
-                                .unreadMessagesCount(unread)
-                                .lastMessageTime(
-                                        chatWithTime.getLastMessageTime() != null
-                                                ? chatWithTime.getLastMessageTime().toString()
-                                                : null
-                                )
-                                .build();
+                        return messageFetcher.findLastMessageInChat(chatList)
+                                        .map(message -> UserChatDTO.builder()
+                                                .chatId(chatInfo.getChatId())
+                                                .chatType(chatInfo.getChatType())
+                                                .name(chatInfo.getName())
+                                                .avatar(chatInfo.getAvatar())
+                                                .unreadMessagesCount(unread)
+                                                .lastMessageTime(
+                                                        chatWithTime.getLastMessageTime() != null
+                                                                ? chatWithTime.getLastMessageTime().toString()
+                                                                : null
+                                                )
+                                                .lastMessageContent(
+                                                        message.getContent()
+                                                )
+                                                .build());
+
                     });
         });
     }

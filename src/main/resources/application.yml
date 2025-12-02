@@ -17,10 +17,11 @@ spring:
     allow-bean-definition-overriding: true
 
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP:kafka:29092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
     topic:
-      message.in: ${KAFKA_TOPIC_MESSAGES_IN:messages-in}
+      message.in: ${KAFKA_TOPIC_MESSAGES_IN:chat-persistence-in}
       dlq: ${KAFKA_TOPIC_DLQ:chat.dlq}
+      message.out: ${KAFKA_TOPIC_MESSAGES:messages}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
@@ -39,18 +40,18 @@ spring:
       max-poll-records: 500
       isolation-level: read_committed
 
+  cassandra:
+    keyspace-name: ${CASSANDRA_KEYSPACE:chat_keyspace}
+    contact-points: ${CASSANDRA_CONTACT_POINTS:localhost:9042}
+    local-datacenter: ${CASSANDRA_DC:datacenter1}
+    schema-action: create_if_not_exists
+    cluster-name: messenger-local
+    request:
+      timeout: 60s
+    connection:
+      connect-timeout: 30s
+      init-query-timeout: 30s
   data:
-    cassandra:
-      keyspace-name: ${CASSANDRA_KEYSPACE:chat_keyspace}
-      contact-points: ${CASSANDRA_CONTACT_POINTS:localhost:9042}
-      local-datacenter: ${CASSANDRA_DC:datacenter1}
-      schema-action: create_if_not_exists
-      cluster-name: messenger-local
-      request:
-        timeout: 2000ms
-      connection:
-        connect-timeout: 30000ms
-        init-query-timeout: 30000ms
     elasticsearch:
       uris: ${ELASTICSEARCH_URIS:http://localhost:9200}
       username: ${ELASTICSEARCH_USERNAME:}
@@ -63,8 +64,8 @@ spring:
 
 redis:
   cache:
-    cluster:
-      nodes: ${REDIS_CACHE_NODES:localhost:6391,localhost:6392,localhost:6393}
+    host: ${REDIS_CACHE_HOST:localhost}
+    port: ${REDIS_CACHE_PORT:6380}
     config:
       connect-timeout-ms: 500
       command-timeout-ms: 1000
@@ -117,15 +118,11 @@ security:
 resilience4j:
   circuitbreaker:
     instances:
-      redisOps:
+      kafkaProducer:
         registerHealthIndicator: true
-        slidingWindowSize: 50
-        failureRateThreshold: 30
+        slidingWindowSize: 100
+        failureRateThreshold: 50
         waitDurationInOpenState: 10s
-        ignoreExceptions:
-          - com.messenger.chat_service_new.error.ServiceDegradedException
-        recordExceptions:
-          - org.springframework.data.redis.RedisConnectionFailureException
 
 chat:
   id: ${CHAT_ID:chat-${random.uuid}}    # change in prod

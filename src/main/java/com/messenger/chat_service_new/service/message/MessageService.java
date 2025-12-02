@@ -38,7 +38,7 @@ public class MessageService {
     private final MessageEnricher messageEnricher;
     private final MessageSecurityValidator securityValidator;
 
-    public Mono<List<MessageDTO>> getMessages(UUID chatId, long limit, String bucketMonth, UUID after, UUID before, UUID around) {
+    public Mono<List<MessageDTO>> getMessages(UUID chatId, int limit, String bucketMonth, UUID after, UUID before, UUID around) {
         if (limit > maxLimit) {
             return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Limit exceeds maximum of 100"));
         }
@@ -56,7 +56,7 @@ public class MessageService {
                                     return Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST,
                                             "bucketMonth is required when using 'around'"));
                                 }
-                                long half = limit / 2;
+                                int half = limit / 2;
                                 return messageFetcher.fetchAroundMessage(chatId, around, half, initialBucket)
                                         .map(messageMapper::entitiesToDTOs)
                                         .flatMap(messageEnricher::enrichWithUser)

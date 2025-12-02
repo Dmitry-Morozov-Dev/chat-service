@@ -33,4 +33,7 @@ public class UserChatDTO {
 
     @JsonProperty("last_message_time")
     private String lastMessageTime;
+
+    @JsonProperty("last_message_content")
+    private String lastMessageContent;
 }

@@ -67,7 +67,7 @@ public class Message {
     @JsonProperty("metadata")
     private Map<String, String> metadata;
 
-    @PrimaryKeyColumn("replyToMessageId")
+    @Column("replyToMessageId")
     @CassandraType(type = CassandraType.Name.TIMEUUID)
     @JsonProperty("replyToMessageId")
     private UUID replyToMessageId;

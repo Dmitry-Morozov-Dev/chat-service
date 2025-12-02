@@ -1,7 +1,9 @@
 package com.messenger.chat_service_new.service.message;
 
+import com.messenger.chat_service_new.model.chat.UserChatsList;
 import com.messenger.chat_service_new.model.message.Message;
 import com.messenger.chat_service_new.repository.MessageRepository;
+import com.messenger.chat_service_new.modelHelper.projectors.LastMessageTimeProjection;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -9,7 +11,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
-import java.time.Instant;
 import java.time.Instant;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
@@ -28,7 +29,7 @@ public class MessageFetcher {
 
     public Mono<List<Message>> fetchMessagesAcrossBuckets(UUID chatId,
                                                           String currentBucket,
-                                                          long remaining,
+                                                          int remaining,
                                                           UUID after,
                                                           UUID before,
                                                           Instant chatCreatedAt) {
@@ -45,7 +46,7 @@ public class MessageFetcher {
                         return Mono.just(messages);
                     }
 
-                    long newRemaining = remaining - messages.size();
+                    int newRemaining = remaining - messages.size();
                     YearMonth nextBucket = (after != null) ? bucket.plusMonths(1) : bucket.minusMonths(1);
                     String nextBucketStr = nextBucket.format(DateTimeFormatter.ofPattern("yyyy-MM"));
 
@@ -58,7 +59,40 @@ public class MessageFetcher {
                 });
     }
 
-    public Mono<List<Message>> fetchFromCassandra(UUID chatId, String bucketMonth, long limit, UUID after, UUID before) {
+    public Mono<Instant> findLastMessageTimeInChat(UserChatsList chat) {
+
+        YearMonth start = YearMonth.from(chat.getCreatedAt().atZone(ZoneOffset.UTC));
+        YearMonth current = YearMonth.now(ZoneOffset.UTC);
+
+        return findRecursive(chat.getChatId(), current, start)
+                .map(Message::getCreatedAt)
+                .defaultIfEmpty(chat.getCreatedAt());
+    }
+
+    public Mono<Message> findLastMessageInChat(UserChatsList chat) {
+
+        YearMonth start = YearMonth.from(chat.getCreatedAt().atZone(ZoneOffset.UTC));
+        YearMonth current = YearMonth.now(ZoneOffset.UTC);
+
+        return findRecursive(chat.getChatId(), current, start);
+    }
+
+    private Mono<Message> findRecursive(UUID chatId, YearMonth current, YearMonth lowerBound) {
+
+        if (current.isBefore(lowerBound)) {
+            return Mono.empty();
+        }
+
+        String bucket = current.format(DateTimeFormatter.ofPattern("yyyy-MM"));
+
+        return messageRepository
+                .findFirstByChatIdAndBucketMonthOrderByMessageIdDesc(chatId, bucket)
+                .switchIfEmpty(
+                        findRecursive(chatId, current.minusMonths(1), lowerBound)
+                );
+    }
+
+    public Mono<List<Message>> fetchFromCassandra(UUID chatId, String bucketMonth, int limit, UUID after, UUID before) {
         if (after != null) {
             return messageRepository.findMessagesAfter(chatId, bucketMonth, after, limit)
                     .collectList()
@@ -74,7 +108,7 @@ public class MessageFetcher {
         }
     }
 
-    public Mono<List<Message>> fetchAroundMessage(UUID chatId, UUID aroundId, long halfLimit, String bucketMonth) {
+    public Mono<List<Message>> fetchAroundMessage(UUID chatId, UUID aroundId, int halfLimit, String bucketMonth) {
         return messageRepository.findByChatIdAndBucketMonthAndMessageId(chatId, bucketMonth, aroundId)
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Message not found")))
                 .flatMap(centerMessage -> {
@@ -95,7 +129,7 @@ public class MessageFetcher {
                 })
                 .flatMap(list -> {
                     if (list.size() < 2 * halfLimit + 1) {
-                        long missing = 2 * halfLimit + 1 - list.size();
+                        int missing = 2 * halfLimit + 1 - list.size();
                         YearMonth prevMonth = YearMonth.parse(bucketMonth).minusMonths(1);
                         String prevBucket = prevMonth.format(DateTimeFormatter.ofPattern("yyyy-MM"));
 

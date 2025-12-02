@@ -26,19 +26,19 @@ import java.util.List;
 @EntityScan(basePackages = "com.messenger.chat_service_new.model")
 public class CassandraConfig extends AbstractReactiveCassandraConfiguration {
 
-    @Value("${spring.data.cassandra.keyspace-name:chat_keyspace}")
+    @Value("${spring.cassandra.keyspace-name:chat_keyspace}")
     private String keyspace;
 
-    @Value("${spring.data.cassandra.contact-points:localhost:9042}")
+    @Value("${spring.cassandra.contact-points:localhost:9042}")
     private String contactPoints;
 
-    @Value("${spring.data.cassandra.local-datacenter:datacenter1}")
+    @Value("${spring.cassandra.local-datacenter:datacenter1}")
     private String localDatacenter;
 
-    @Value("${spring.data.cassandra.request.timeout:5s}")
+    @Value("${spring.cassandra.request.timeout:30s}")
     private Duration requestTimeout;
 
-    @Value("${spring.data.cassandra.connection.connect-timeout:5s}")
+    @Value("${spring.cassandra.connection.connect-timeout:30s}")
     private Duration connectTimeout;
 
     @Override
@@ -66,31 +66,7 @@ public class CassandraConfig extends AbstractReactiveCassandraConfiguration {
         return builder -> builder.withConfigLoader(DriverConfigLoader.programmaticBuilder()
                 .withDuration(DefaultDriverOption.REQUEST_TIMEOUT, requestTimeout)
                 .withDuration(DefaultDriverOption.CONNECTION_CONNECT_TIMEOUT, connectTimeout)
+                .withDuration(DefaultDriverOption.METADATA_SCHEMA_REQUEST_TIMEOUT, Duration.ofSeconds(60))
                 .build());
     }
-
-    @WritingConverter
-    public class InstantToDateConverter implements Converter<Instant, Date> {
-        @Override
-        public Date convert(Instant source) {
-            return Date.from(source);
-        }
-    }
-
-    @ReadingConverter
-    public class DateToInstantConverter implements Converter<Date, Instant> {
-        @Override
-        public Instant convert(Date source) {
-            return source.toInstant();
-        }
-    }
-
-    @Override
-    public CassandraCustomConversions customConversions() {
-        List<Converter<?, ?>> converters = new ArrayList<>();
-        converters.add(new InstantToDateConverter());
-        converters.add(new DateToInstantConverter());
-        return new CassandraCustomConversions(converters);
-    }
-
 }

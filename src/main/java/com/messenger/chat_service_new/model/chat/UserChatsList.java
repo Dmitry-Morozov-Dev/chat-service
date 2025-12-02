@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.cassandra.core.cql.PrimaryKeyType;
 import org.springframework.data.cassandra.core.mapping.*;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Data
@@ -28,4 +29,9 @@ public class UserChatsList {
     @CassandraType(type = CassandraType.Name.UUID)
     @JsonProperty("chat_id")
     private UUID chatId;
+
+    @Column("created_at")
+    @CassandraType(type = CassandraType.Name.TIMESTAMP)
+    @JsonProperty("created_at")
+    private Instant createdAt;
 }

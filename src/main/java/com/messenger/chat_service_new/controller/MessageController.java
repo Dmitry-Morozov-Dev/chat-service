@@ -3,6 +3,7 @@ package com.messenger.chat_service_new.controller;
 import com.messenger.chat_service_new.modelHelper.DTO.MessageDTO;
 import com.messenger.chat_service_new.service.message.MessageService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.hateoas.EntityModel;
 import org.springframework.hateoas.IanaLinkRelations;
@@ -14,6 +15,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.UUID;
 
+@Slf4j
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/chats")
@@ -22,7 +24,7 @@ public class MessageController {
     private final MessageService messageService;
 
     @Value("${app.pagination.default-limit}")
-    private long defaultLimit;
+    private int defaultLimit;
 
     @Value("${app.pagination.max-limit}")
     private long maxLimit;
@@ -30,13 +32,13 @@ public class MessageController {
     @GetMapping("/{chat_id}/messages")
     public Mono<ResponseEntity<PagedModel<EntityModel<MessageDTO>>>> getMessages(
             @PathVariable("chat_id") UUID chatId,
-            @RequestParam(required = false) Long limit,
+            @RequestParam(required = false) Integer limit,
             @RequestParam(defaultValue = "", required = false) String bucketMonth,
             @RequestParam(defaultValue = "", required = false) UUID after,
             @RequestParam(defaultValue = "", required = false) UUID before,
             @RequestParam(defaultValue = "", required = false) UUID around) {
 
-        long finalLimit = limit != null ? limit : defaultLimit;
+        int finalLimit = limit != null ? limit : defaultLimit;
 
         return messageService.getMessages(chatId, finalLimit, bucketMonth, after, before, around)
                 .flatMap(messages -> {
@@ -69,7 +71,9 @@ public class MessageController {
                         pagedModel.add(Link.of(base + "&before=" + firstId, IanaLinkRelations.PREV));
                     }
 
-                    return Mono.just(ResponseEntity.ok(pagedModel));
+                    return Mono.just(ResponseEntity.ok(pagedModel))
+                            .doOnSuccess(e -> log.debug("Success"))
+                            .doOnError(e -> log.error(e.getMessage()));
                 });
     }
 
